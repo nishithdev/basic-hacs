@@ -1,0 +1,7 @@
+{
+    "name": "My HACS Test",
+    "content_in_root": false,
+    "domains": ["my_hacs_test"],
+    "country": "US",
+    "homeassistant": "2023.0.0"
+  }

@@ -1,0 +1,9 @@
+{
+    "domain": "my_hacs_test",
+    "name": "My HACS Test",
+    "version": "1.0.0",
+    "documentation": "https://github.com/nishithdev/basic-hacs",
+    "requirements": [],
+    "dependencies": [],
+    "codeowners": ["@nishithdev"]
+  }
