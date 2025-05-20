@@ -7,7 +7,11 @@ import httpx
 
 AUTH_URL = "https://coserv.smarthub.coop/services/oauth/auth/v2"
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
+async def async_setup_entry(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    async_add_entities: AddEntitiesCallback
+):
     user_id = entry.data["user_id"]
     password = entry.data["password"]
     async_add_entities([CoServAccessTokenSensor(user_id, password)])
@@ -28,8 +32,8 @@ class CoServAccessTokenSensor(SensorEntity):
         }
 
         cookies = {
-            "JSESSIONID-consumer_1.0": "placeholder",
-            "XSRF-TOKEN": "placeholder",
+            "JSESSIONID-consumer_1.0": "aed357ac-00ad-43a9-a623-495cb0c5a850",  # Real session might be needed
+            "XSRF-TOKEN": "Xv+SxTFmc1/RVhW7uY125Q==",
         }
 
         data = {
@@ -40,30 +44,24 @@ class CoServAccessTokenSensor(SensorEntity):
         try:
             async with httpx.AsyncClient(timeout=10) as client:
                 response = await client.post(AUTH_URL, headers=headers, cookies=cookies, data=data)
-                
-                if response.status_code == 200:
-                    json_data = response.json()
-                    token = json_data.get("access_token")
-                    
-                    if token:
-                        self._attr_native_value = token
-                        self._attr_extra_state_attributes = {
-                            "expires_in": json_data.get("expires_in"),
-                            "token_type": json_data.get("token_type"),
-                            "status_code": response.status_code
-                        }
-                    else:
-                        self._attr_native_value = "Login failed"
-                        self._attr_extra_state_attributes = {
-                            "error": "No access token in response",
-                            "status_code": response.status_code,
-                            "response_text": response.text
-                        }
+                json_data = response.json()
 
-                else:
-                    self._attr_native_value = f"HTTP error {response.status_code}"
+                status = json_data.get("status", "").upper()
+
+                if response.status_code == 200 and status == "SUCCESS" and "access_token" in json_data:
+                    token = json_data["access_token"]
+                    self._attr_native_value = token
                     self._attr_extra_state_attributes = {
-                        "reason": response.reason_phrase,
+                        "expires_in": json_data.get("expires_in"),
+                        "token_type": json_data.get("token_type"),
+                        "status": status,
+                        "status_code": response.status_code
+                    }
+                else:
+                    self._attr_native_value = "Login failed"
+                    self._attr_extra_state_attributes = {
+                        "status": status,
+                        "error": json_data.get("error_description", "No access_token in response"),
                         "status_code": response.status_code,
                         "response_text": response.text
                     }
