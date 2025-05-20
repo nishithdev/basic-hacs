@@ -14,15 +14,15 @@ async def async_setup_entry(
 ):
     user_id = entry.data["user_id"]
     password = entry.data["password"]
-    async_add_entities([CoServAuthTokenSensor(user_id, password)])
+    async_add_entities([CoServAccessTokenSensor(user_id, password)])
 
 
-class CoServAuthTokenSensor(SensorEntity):
+class CoServAccessTokenSensor(SensorEntity):
     def __init__(self, user_id: str, password: str):
         self._user_id = user_id
         self._password = password
-        self._attr_name = "CoServ Authorization Token"
-        self._attr_unique_id = f"coserv_auth_token_sensor_{user_id}"
+        self._attr_name = "CoServ Access Token"
+        self._attr_unique_id = f"coserv_access_token_sensor_{user_id}"
         self._attr_native_value = None
         self._attr_extra_state_attributes = {}
 
@@ -31,9 +31,8 @@ class CoServAuthTokenSensor(SensorEntity):
             "Content-Type": "application/x-www-form-urlencoded",
         }
 
-        # Using static cookies provided by you
         cookies = {
-            "JSESSIONID-consumer_1.0": "aed357ac-00ad-43a9-a623-495cb0c5a850",
+            "JSESSIONID-consumer_1.0": "aed357ac-00ad-43a9-a623-495cb0c5a850",  # Real session might be needed
             "XSRF-TOKEN": "Xv+SxTFmc1/RVhW7uY125Q==",
         }
 
@@ -49,8 +48,8 @@ class CoServAuthTokenSensor(SensorEntity):
 
                 status = json_data.get("status", "").upper()
 
-                if response.status_code == 200 and status == "SUCCESS" and "authorizationToken" in json_data:
-                    token = json_data["authorizationToken"]
+                if response.status_code == 200 and status == "SUCCESS" and "access_token" in json_data:
+                    token = json_data["access_token"]
                     self._attr_native_value = token
                     self._attr_extra_state_attributes = {
                         "expires_in": json_data.get("expires_in"),
@@ -62,7 +61,7 @@ class CoServAuthTokenSensor(SensorEntity):
                     self._attr_native_value = "Login failed"
                     self._attr_extra_state_attributes = {
                         "status": status,
-                        "error": json_data.get("error_description", "No authorizationToken in response"),
+                        "error": json_data.get("error_description", "No access_token in response"),
                         "status_code": response.status_code,
                         "response_text": response.text
                     }
