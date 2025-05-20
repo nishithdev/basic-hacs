@@ -1,16 +1,25 @@
-from homeassistant.helpers.entity import Entity
+from homeassistant.components.sensor import SensorEntity
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
+import datetime
 
-async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
-    async_add_entities([MyTestSensor()])
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
+    async_add_entities([HACSTestSensor()])
 
-class MyTestSensor(Entity):
+class HACSTestSensor(SensorEntity):
     def __init__(self):
-        self._state = "Hello from HACS"
+        self._attr_name = "HACS Test Sensor"
+        self._attr_unique_id = "hacs_test_sensor"
 
     @property
-    def name(self):
-        return "HACS Test Sensor"
+    def native_value(self):
+        return datetime.datetime.now().strftime("%H:%M:%S")
 
     @property
-    def state(self):
-        return self._state
+    def native_unit_of_measurement(self):
+        return None
+
+    async def async_update(self):
+        # Called by HA scheduler
+        self._attr_native_value = datetime.datetime.now().strftime("%H:%M:%S")

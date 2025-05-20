@@ -1,9 +1,12 @@
 {
     "domain": "my_hacs_test",
     "name": "My HACS Test",
-    "version": "1.0.0",
-    "documentation": "https://github.com/nishithdev/basic-hacs",
+    "version": "1.0.1",
+    "documentation": "https://github.com/nishithdev/my_hacs_test",
     "requirements": [],
     "dependencies": [],
-    "codeowners": ["@nishithdev"]
+    "codeowners": ["@nishithdev"],
+    "config_flow": false,
+    "integration_type": "integration",
+    "iot_class": "local_polling"
   }
