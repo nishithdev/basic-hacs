@@ -24,8 +24,12 @@ class StockPriceSensor(SensorEntity):
     async def async_update(self):
         try:
             stock = yf.Ticker(self._symbol)
-            price = stock.fast_info["last_price"]
-            self._attr_native_value = round(price, 2)
+            price = stock.fast_info.get("last_price")  # Use .get() to avoid KeyError
+            if price is not None:
+                self._attr_native_value = round(price, 2)
+            else:
+                _LOGGER.warning(f"Price data not available for {self._symbol}")
+                self._attr_native_value = None
         except Exception as e:
             _LOGGER.warning(f"Failed to fetch stock price for {self._symbol}: {e}")
             self._attr_native_value = None
