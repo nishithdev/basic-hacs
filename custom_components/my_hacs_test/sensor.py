@@ -4,9 +4,11 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .const import DOMAIN
 import httpx
+from datetime import timedelta
 
 AUTH_URL = "https://coserv.smarthub.coop/services/oauth/auth/v2"
 
+SCAN_INTERVAL = timedelta(hours=4)
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
