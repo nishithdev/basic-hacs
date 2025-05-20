@@ -58,15 +58,15 @@ class CoServAccessTokenSensor(SensorEntity):
                         "status_code": response.status_code
                     }
                 else:
+                    self._attr_native_value = "Login failed bad"
                     token = json_data.get("authorizationToken") # checking why token is not working in above step
-                    self._attr_native_value = "Login failed after attempted token in fail"
                     self._attr_extra_state_attributes = {
                         "status": status,
                         "authorizationToken": token,
                         # "token": json_data["authorizationToken"],
                         "error": json_data.get("error_description", "No access_token in response"),
                         "status_code": response.status_code,
-                        "response_text": response.text
+                        # "response_text": response.text
                     }
 
         except httpx.RequestError as e:
