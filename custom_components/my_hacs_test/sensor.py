@@ -49,7 +49,7 @@ class CoServAccessTokenSensor(SensorEntity):
                 status = json_data.get("status", "").upper()
 
                 if response.status_code == 200 and status == "SUCCESS" and "authorizationToken" in json_data:
-                    # token = json_data["authorizationToken"]
+                    token = json_data["authorizationToken"]
                     self._attr_native_value = token
                     self._attr_extra_state_attributes = {
                         "expires_in": json_data.get("expires_in"),
