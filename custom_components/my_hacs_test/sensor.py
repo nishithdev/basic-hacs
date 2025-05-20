@@ -25,8 +25,6 @@ class CoServAccessTokenSensor(SensorEntity):
         self._attr_unique_id = f"coserv_access_token_sensor_{user_id}"
         self._attr_native_value = None
         self._attr_extra_state_attributes = {}
-        self._attr_device_class = None  # explicitly no device class
-        self._attr_state_class = None   # not a measurement
 
     async def async_update(self):
         headers = {
@@ -50,8 +48,8 @@ class CoServAccessTokenSensor(SensorEntity):
 
                 status = json_data.get("status", "").upper()
 
-                if response.status_code == 200 and status == "SUCCESS" and "authorizationToken" in json_data:
-                    token = json_data["authorizationToken"]
+                if response.status_code == 200 and status == "SUCCESS" and "access_token" in json_data:
+                    token = json_data["access_token"]
                     self._attr_native_value = token
                     self._attr_extra_state_attributes = {
                         "expires_in": json_data.get("expires_in"),
@@ -59,7 +57,6 @@ class CoServAccessTokenSensor(SensorEntity):
                         "status": status,
                         "status_code": response.status_code
                     }
-                    self.async_write_ha_state()  
                 else:
                     self._attr_native_value = "Login failed bad"
                     token = json_data.get("authorizationToken") # checking why token is not working in above step
