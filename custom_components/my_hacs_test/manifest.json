@@ -3,7 +3,7 @@
     "name": "My HACS Test",
     "version": "1.0.1",
     "documentation": "https://github.com/nishithdev/my_hacs_test",
-    "requirements": [],
+    "requirements": ["yfinance==0.2.33"],
     "dependencies": [],
     "codeowners": ["@nishithdev"],
     "config_flow": true,
