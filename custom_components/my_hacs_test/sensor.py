@@ -51,7 +51,7 @@ class CoServAccessTokenSensor(SensorEntity):
                 status = json_data.get("status", "").upper()
 
                 if response.status_code == 200 and status == "SUCCESS" and "access_token" in json_data:
-                    token = json_data["access_token"]
+                    token = json_data["authorizationToken"]
                     self._attr_native_value = token
                     self._attr_extra_state_attributes = {
                         "expires_in": json_data.get("expires_in"),
@@ -63,6 +63,7 @@ class CoServAccessTokenSensor(SensorEntity):
                     self._attr_native_value = "Login failed"
                     self._attr_extra_state_attributes = {
                         "status": status,
+                        "expires_in": json_data.get("expires_in")
                         "error": json_data.get("error_description", "No access_token in response"),
                         "status_code": response.status_code,
                         "response_text": response.text
