@@ -3,10 +3,10 @@
     "name": "My HACS Test",
     "version": "1.0.1",
     "documentation": "https://github.com/nishithdev/my_hacs_test",
-    "requirements": ["yfinance==0.2.33"],
+    "requirements": ["httpx"],
     "dependencies": [],
-    "codeowners": ["@nishithdev"],
+    "codeowners": ["@yourusername"],
     "config_flow": true,
     "integration_type": "integration",
-    "iot_class": "local_polling"
+    "iot_class": "cloud_polling"
   }
