@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>CSV/XLSX Viewer & Editor</title>
+  <title>CSV/XLSX Editor</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -21,8 +21,10 @@
     th, td {
       border: 1px solid #ccc;
       padding: 0.5em;
-      text-align: left;
       position: relative;
+    }
+    td[contenteditable="true"] {
+      background-color: #ffffe0;
     }
     th button, td button {
       position: absolute;
@@ -31,129 +33,174 @@
       background-color: red;
       color: white;
       border: none;
-      padding: 0.2em 0.4em;
       font-size: 0.8em;
+      padding: 0.2em 0.4em;
       cursor: pointer;
     }
-    th button:hover, td button:hover {
-      background-color: darkred;
+    tr.draggable {
+      cursor: move;
+    }
+    tr.dragging {
+      opacity: 0.5;
     }
   </style>
 </head>
 <body>
 
-  <h1>CSV/XLSX Viewer, Filter, Clean & Export</h1>
+<h1>CSV/XLSX Editor & Cleaner</h1>
 
-  <input type="file" id="fileInput" accept=".csv, .xlsx" />
-  <input type="text" id="filterInput" placeholder="Filter rows..." />
-  <button id="downloadBtn" style="display:none;">Download Cleaned CSV</button>
+<input type="file" id="fileInput" accept=".csv, .xlsx" />
+<input type="text" id="filterInput" placeholder="Filter rows..." />
+<button id="downloadCSV">Download CSV</button>
+<button id="downloadXLSX">Download XLSX</button>
 
-  <div id="output"></div>
+<div id="output"></div>
 
-  <!-- SheetJS (XLSX parser) -->
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
-  <script>
-    let originalData = [];
+<script>
+  let originalData = [];
 
-    document.getElementById('fileInput').addEventListener('change', handleFile);
+  document.getElementById('fileInput').addEventListener('change', handleFile);
+  document.getElementById('filterInput').addEventListener('input', applyFilter);
+  document.getElementById('downloadCSV').addEventListener('click', downloadCSV);
+  document.getElementById('downloadXLSX').addEventListener('click', downloadXLSX);
 
-    document.getElementById('filterInput').addEventListener('input', () => {
-      const term = document.getElementById('filterInput').value.toLowerCase();
-      const filtered = originalData.filter((row, index) =>
-        index === 0 || row.some(cell => cell.toLowerCase().includes(term))
-      );
-      renderTable(filtered);
-    });
-
-    document.getElementById('downloadBtn').addEventListener('click', () => {
-      const tableRows = Array.from(document.querySelectorAll("table tr")).map(tr =>
-        Array.from(tr.children).map(td => `"${td.textContent.replace(/"/g, '""')}"`).join(",")
-      );
-      const csvContent = tableRows.join("\n");
-      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
-      link.download = "cleaned_data.csv";
-      link.click();
-    });
-
-    function handleFile(e) {
-      const file = e.target.files[0];
-      if (!file) return;
-
-      const reader = new FileReader();
-
-      if (file.name.endsWith(".csv")) {
-        reader.onload = (e) => {
-          originalData = e.target.result.trim().split("\n").map(line => line.split(","));
-          renderTable(originalData);
-          showDownload();
-        };
-        reader.readAsText(file);
-      } else if (file.name.endsWith(".xlsx")) {
-        reader.onload = (e) => {
-          const data = new Uint8Array(e.target.result);
-          const workbook = XLSX.read(data, { type: "array" });
-          const sheet = workbook.Sheets[workbook.SheetNames[0]];
-          originalData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-          renderTable(originalData);
-          showDownload();
-        };
-        reader.readAsArrayBuffer(file);
-      }
+  function handleFile(e) {
+    const file = e.target.files[0];
+    const reader = new FileReader();
+    if (file.name.endsWith('.csv')) {
+      reader.onload = () => {
+        originalData = reader.result.trim().split("\n").map(r => r.split(","));
+        renderTable(originalData);
+      };
+      reader.readAsText(file);
+    } else if (file.name.endsWith('.xlsx')) {
+      reader.onload = () => {
+        const data = new Uint8Array(reader.result);
+        const workbook = XLSX.read(data, { type: "array" });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        originalData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+        renderTable(originalData);
+      };
+      reader.readAsArrayBuffer(file);
     }
+  }
 
-    function renderTable(data) {
-      const table = document.createElement("table");
+  function renderTable(data) {
+    const table = document.createElement("table");
 
-      data.forEach((row, rowIndex) => {
-        const tr = document.createElement("tr");
+    data.forEach((row, rowIndex) => {
+      const tr = document.createElement("tr");
+      tr.setAttribute("draggable", rowIndex !== 0);
+      tr.classList.add("draggable");
 
-        row.forEach((cell, colIndex) => {
-          const cellEl = document.createElement(rowIndex === 0 ? "th" : "td");
-          cellEl.textContent = cell;
-
-          if (rowIndex === 0) {
-            const colBtn = document.createElement("button");
-            colBtn.textContent = "×";
-            colBtn.title = "Remove column";
-            colBtn.onclick = () => removeColumn(colIndex);
-            cellEl.appendChild(colBtn);
-          }
-
-          tr.appendChild(cellEl);
-        });
-
+      row.forEach((cell, colIndex) => {
+        const el = document.createElement(rowIndex === 0 ? "th" : "td");
+        el.textContent = cell;
         if (rowIndex !== 0) {
-          const rowBtn = document.createElement("button");
-          rowBtn.textContent = "×";
-          rowBtn.title = "Remove row";
-          rowBtn.onclick = () => removeRow(rowIndex);
-          tr.firstChild.appendChild(rowBtn);
+          el.setAttribute("contenteditable", "true");
         }
-
-        table.appendChild(tr);
+        if (rowIndex === 0) {
+          const colBtn = document.createElement("button");
+          colBtn.textContent = "×";
+          colBtn.title = "Delete column";
+          colBtn.onclick = () => deleteColumn(colIndex);
+          el.appendChild(colBtn);
+        }
+        tr.appendChild(el);
       });
 
-      const output = document.getElementById("output");
-      output.innerHTML = "";
-      output.appendChild(table);
-    }
+      if (rowIndex !== 0) {
+        const rowBtn = document.createElement("button");
+        rowBtn.textContent = "×";
+        rowBtn.title = "Delete row";
+        rowBtn.onclick = () => deleteRow(rowIndex);
+        tr.firstChild.appendChild(rowBtn);
+      }
 
-    function removeRow(index) {
-      originalData.splice(index, 1);
-      renderTable(originalData);
-    }
+      addDragListeners(tr);
+      table.appendChild(tr);
+    });
 
-    function removeColumn(colIndex) {
-      originalData = originalData.map(row => row.filter((_, i) => i !== colIndex));
-      renderTable(originalData);
-    }
+    const output = document.getElementById("output");
+    output.innerHTML = "";
+    output.appendChild(table);
+  }
 
-    function showDownload() {
-      document.getElementById("downloadBtn").style.display = "inline-block";
-    }
-  </script>
+  function applyFilter() {
+    const term = document.getElementById("filterInput").value.toLowerCase();
+    const filtered = originalData.filter((row, i) =>
+      i === 0 || row.some(cell => cell.toLowerCase().includes(term))
+    );
+    renderTable(filtered);
+  }
+
+  function deleteRow(index) {
+    originalData.splice(index, 1);
+    renderTable(originalData);
+  }
+
+  function deleteColumn(index) {
+    originalData = originalData.map(row => row.filter((_, i) => i !== index));
+    renderTable(originalData);
+  }
+
+  function getTableData() {
+    const rows = document.querySelectorAll("table tr");
+    return Array.from(rows).map(tr =>
+      Array.from(tr.children).map(td => td.textContent.trim())
+    );
+  }
+
+  function downloadCSV() {
+    const data = getTableData();
+    const csv = data.map(r => r.map(c => `"${c.replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "cleaned_data.csv";
+    link.click();
+  }
+
+  function downloadXLSX() {
+    const data = getTableData();
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
+    XLSX.writeFile(wb, "cleaned_data.xlsx");
+  }
+
+  // DRAG-AND-DROP ROWS
+  let draggedRow = null;
+
+  function addDragListeners(row) {
+    row.addEventListener("dragstart", () => {
+      draggedRow = row;
+      row.classList.add("dragging");
+    });
+
+    row.addEventListener("dragend", () => {
+      draggedRow = null;
+      row.classList.remove("dragging");
+    });
+
+    row.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      const rows = Array.from(row.parentElement.children);
+      const draggedIndex = rows.indexOf(draggedRow);
+      const targetIndex = rows.indexOf(row);
+      if (draggedRow && draggedRow !== row && draggedIndex !== 0 && targetIndex !== 0) {
+        row.parentElement.insertBefore(draggedRow, draggedIndex < targetIndex ? row.nextSibling : row);
+        updateOriginalDataFromDOM();
+      }
+    });
+  }
+
+  function updateOriginalDataFromDOM() {
+    originalData = getTableData();
+  }
+</script>
+
 </body>
 </html>
