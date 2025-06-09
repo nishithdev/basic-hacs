@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>CSV/XLSX Viewer & Editor</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 2em;
+    }
+    input, button {
+      margin: 0.5em 0;
+      padding: 0.5em;
+      font-size: 1em;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 1em;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 0.5em;
+      text-align: left;
+      position: relative;
+    }
+    th button, td button {
+      position: absolute;
+      top: 2px;
+      right: 2px;
+      background-color: red;
+      color: white;
+      border: none;
+      padding: 0.2em 0.4em;
+      font-size: 0.8em;
+      cursor: pointer;
+    }
+    th button:hover, td button:hover {
+      background-color: darkred;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>CSV/XLSX Viewer, Filter, Clean & Export</h1>
+
+  <input type="file" id="fileInput" accept=".csv, .xlsx" />
+  <input type="text" id="filterInput" placeholder="Filter rows..." />
+  <button id="downloadBtn" style="display:none;">Download Cleaned CSV</button>
+
+  <div id="output"></div>
+
+  <!-- SheetJS (XLSX parser) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <script>
+    let originalData = [];
+
+    document.getElementById('fileInput').addEventListener('change', handleFile);
+
+    document.getElementById('filterInput').addEventListener('input', () => {
+      const term = document.getElementById('filterInput').value.toLowerCase();
+      const filtered = originalData.filter((row, index) =>
+        index === 0 || row.some(cell => cell.toLowerCase().includes(term))
+      );
+      renderTable(filtered);
+    });
+
+    document.getElementById('downloadBtn').addEventListener('click', () => {
+      const tableRows = Array.from(document.querySelectorAll("table tr")).map(tr =>
+        Array.from(tr.children).map(td => `"${td.textContent.replace(/"/g, '""')}"`).join(",")
+      );
+      const csvContent = tableRows.join("\n");
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = "cleaned_data.csv";
+      link.click();
+    });
+
+    function handleFile(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+
+      if (file.name.endsWith(".csv")) {
+        reader.onload = (e) => {
+          originalData = e.target.result.trim().split("\n").map(line => line.split(","));
+          renderTable(originalData);
+          showDownload();
+        };
+        reader.readAsText(file);
+      } else if (file.name.endsWith(".xlsx")) {
+        reader.onload = (e) => {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: "array" });
+          const sheet = workbook.Sheets[workbook.SheetNames[0]];
+          originalData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+          renderTable(originalData);
+          showDownload();
+        };
+        reader.readAsArrayBuffer(file);
+      }
+    }
+
+    function renderTable(data) {
+      const table = document.createElement("table");
+
+      data.forEach((row, rowIndex) => {
+        const tr = document.createElement("tr");
+
+        row.forEach((cell, colIndex) => {
+          const cellEl = document.createElement(rowIndex === 0 ? "th" : "td");
+          cellEl.textContent = cell;
+
+          if (rowIndex === 0) {
+            const colBtn = document.createElement("button");
+            colBtn.textContent = "×";
+            colBtn.title = "Remove column";
+            colBtn.onclick = () => removeColumn(colIndex);
+            cellEl.appendChild(colBtn);
+          }
+
+          tr.appendChild(cellEl);
+        });
+
+        if (rowIndex !== 0) {
+          const rowBtn = document.createElement("button");
+          rowBtn.textContent = "×";
+          rowBtn.title = "Remove row";
+          rowBtn.onclick = () => removeRow(rowIndex);
+          tr.firstChild.appendChild(rowBtn);
+        }
+
+        table.appendChild(tr);
+      });
+
+      const output = document.getElementById("output");
+      output.innerHTML = "";
+      output.appendChild(table);
+    }
+
+    function removeRow(index) {
+      originalData.splice(index, 1);
+      renderTable(originalData);
+    }
+
+    function removeColumn(colIndex) {
+      originalData = originalData.map(row => row.filter((_, i) => i !== colIndex));
+      renderTable(originalData);
+    }
+
+    function showDownload() {
+      document.getElementById("downloadBtn").style.display = "inline-block";
+    }
+  </script>
+</body>
+</html>
