@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>CSV Group Viewer (Multiline Safe)</title>
+  <title>Jira Bulk CSV Builder</title>
   <style>
     body { font-family: Arial, sans-serif; padding: 20px; }
     table { width: 100%; border-collapse: collapse; margin-top: 20px; }
@@ -16,7 +16,7 @@
   <h2>Upload Main Resource CSV</h2>
   <p id="status">Loading <code>appcodes.csv</code>...</p>
   <input type="file" id="csvFile" accept=".csv" disabled />
-  <button id="downloadBtn" disabled>Download Final CSV</button>
+  <button id="downloadBtn" disabled>Download Final Jira CSV</button>
 
   <table id="outputTable" style="display:none;">
     <thead>
@@ -101,15 +101,15 @@
       Object.values(groupedData).forEach(group => {
         const groupedResourcesPretty = group.resources.map(r => `"${r}"`).join(', ');
         const summaryText = `Azure compliance: ${group.app} [${group.env}]`;
-        const descriptionText = `Policy: ${group.policy}\\nComponents: ${groupedResourcesPretty}`;
-        const productTeam = appcodeMap[group.app.toUpperCase()] || '';
+        const descriptionText = `Policy: ${group.policy}\\nComponents: ${groupedResourcesPretty}`; // Jira-friendly
+        const productTeam = appcodeMap[group.app.toUpperCase()] || 'OTHERS'; // Default fallback
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td>${group.app}</td>
           <td>${summaryText}</td>
           <td></td>
-          <td><pre>${descriptionText}</pre></td>
+          <td><pre>${descriptionText.replace(/\\n/g, '\n')}</pre></td>
           <td>${groupedResourcesPretty}</td>
           <td></td>
           <td>${productTeam}</td>
@@ -146,45 +146,44 @@
     const csvRows = [csvHeaders];
 
     Object.values(groupedData).forEach(group => {
-        const groupedResourcesPretty = group.resources.map(r => `"${r}"`).join(', ');
-        const summaryText = `Azure compliance: ${group.app} [${group.env}]`;
-        const descriptionText = `Policy: ${group.policy}\\nComponents: ${groupedResourcesPretty}`;
-        const productTeam = appcodeMap[group.app.toUpperCase()] || '';
+      const groupedResourcesPretty = group.resources.map(r => `"${r}"`).join(', ');
+      const summaryText = `Azure compliance: ${group.app} [${group.env}]`;
+      const descriptionText = `Policy: ${group.policy}\\nComponents: ${groupedResourcesPretty}`; // Escaped literal newline
+      const productTeam = appcodeMap[group.app.toUpperCase()] || 'OTHERS';
 
-        const row = [
-            group.app,
-            summaryText,
-            '',
-            descriptionText,
-            groupedResourcesPretty,
-            '',
-            productTeam,
-            group.env,
-            '',
-            ''
-        ];
+      const row = [
+        group.app,
+        summaryText,
+        '',
+        descriptionText,
+        groupedResourcesPretty,
+        '',
+        productTeam,
+        group.env,
+        '',
+        ''
+      ];
 
-        const escapedRow = row.map(cell => {
-            if (cell == null) return '';
-            const cellStr = String(cell);
-            if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n') || cellStr.includes('\r')) {
-            return `"${cellStr.replace(/"/g, '""')}"`;
-            }
-            return cellStr;
-        });
+      const escapedRow = row.map(cell => {
+        if (cell == null) return '';
+        const cellStr = String(cell);
+        if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n') || cellStr.includes('\r')) {
+          return `"${cellStr.replace(/"/g, '""')}"`;
+        }
+        return cellStr;
+      });
 
-        csvRows.push(escapedRow);
-        });
+      csvRows.push(escapedRow);
+    });
 
-    // Join with \r\n for Excel-compatible line breaks
-    const csvString = csvRows.map(r => r.join(',')).join('\r\n');
+    const csvString = csvRows.map(r => r.join(',')).join('\r\n'); // Use CRLF for full compatibility
 
     const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
 
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'final_grouped_output.csv';
+    a.download = 'jira_bulk_issues.csv';
     a.style.display = 'none';
     document.body.appendChild(a);
     a.click();
