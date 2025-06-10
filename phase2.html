@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>CSV Group Viewer</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+    th { background-color: #f4f4f4; }
+    button { margin-top: 10px; padding: 8px 12px; cursor: pointer; }
+    pre { margin: 0; font-family: inherit; }
+  </style>
+</head>
+<body>
+  <h2>Upload CSV and Group by POLICY NAME + APPCODE</h2>
+  <input type="file" id="csvFile" accept=".csv" />
+  <button id="downloadBtn" disabled>Download Grouped CSV</button>
+  
+  <table id="outputTable">
+    <thead>
+      <tr>
+        <th>APPCODE</th>
+        <th>POLICY NAME</th>
+        <th>RESOURCE NAMES (Grouped)</th>
+        <th>ENVIRONMENT</th>
+        <th>Summary</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+    let groupedData = {};
+
+    document.getElementById('csvFile').addEventListener('change', function (e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function (event) {
+        const text = event.target.result;
+        const rows = text.trim().split('\n').map(line => {
+          const matches = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
+          return matches ? matches.map(cell => cell.replace(/^"|"$/g, '')) : [];
+        });
+
+        const headers = rows.shift();
+        const policyIdx = headers.indexOf('POLICY NAME');
+        const appIdx = headers.indexOf('APPCODE');
+        const resourceIdx = headers.indexOf('RESOURCE NAME');
+        const envIdx = headers.indexOf('ENVIRONMENT');
+
+        groupedData = {};
+
+        for (const row of rows) {
+          const key = row[policyIdx] + '|' + row[appIdx];
+          if (!groupedData[key]) {
+            groupedData[key] = {
+              policy: row[policyIdx],
+              app: row[appIdx],
+              resources: [],
+              env: row[envIdx]
+            };
+          }
+          groupedData[key].resources.push(row[resourceIdx]);
+        }
+
+        const tbody = document.querySelector('#outputTable tbody');
+        tbody.innerHTML = '';
+
+        Object.values(groupedData).forEach(group => {
+          const groupedResources = group.resources.map(r => `"${r}"`).join(', ');
+          const summary = `Policy: ${group.policy}\nComponents: ${groupedResources}`;
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${group.app}</td>
+            <td>${group.policy}</td>
+            <td>${groupedResources}</td>
+            <td>${group.env}</td>
+            <td><pre>${summary}</pre></td>
+          `;
+          tbody.appendChild(tr);
+        });
+
+        document.getElementById('downloadBtn').disabled = false;
+      };
+
+      reader.readAsText(file);
+    });
+
+    document.getElementById('downloadBtn').addEventListener('click', () => {
+      if (!groupedData) return;
+
+      const csvRows = [
+        ['APPCODE', 'POLICY NAME', 'RESOURCE NAMES (Grouped)', 'ENVIRONMENT', 'Summary']
+      ];
+
+      Object.values(groupedData).forEach(group => {
+        const groupedResources = group.resources.map(r => `"${r.replace(/"/g, '""')}"`).join(', ');
+        const summary = `Policy: ${group.policy}\nComponents: ${groupedResources}`;
+
+        csvRows.push([
+          group.app,
+          group.policy,
+          groupedResources,
+          group.env,
+          summary
+        ]);
+      });
+
+      const csvString = csvRows.map(row => row.map(cell => {
+        if (cell == null) return '';
+        if (typeof cell === 'string' && (cell.includes(',') || cell.includes('"') || cell.includes('\n'))) {
+          return `"${cell.replace(/"/g, '""')}"`;
+        }
+        return cell;
+      }).join(',')).join('\n');
+
+      const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'grouped_output.csv';
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 100);
+    });
+  </script>
+</body>
+</html>
