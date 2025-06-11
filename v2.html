@@ -7,14 +7,19 @@
   <style>
     body { font-family: Arial, sans-serif; padding: 20px; }
     table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; vertical-align: top; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; vertical-align: top; position: relative; }
     th { background-color: #f4f4f4; }
     button { margin-top: 10px; padding: 8px 12px; cursor: pointer; }
     .delete-btn {
-      background: none;
-      color: red;
-      font-size: 16px;
+      background: red;
+      color: white;
+      font-size: 0.8em;
       border: none;
+      border-radius: 4px;
+      padding: 2px 6px;
+      position: absolute;
+      top: 2px;
+      right: 2px;
       cursor: pointer;
     }
     pre { margin: 0; font-family: inherit; white-space: pre-wrap; }
@@ -41,19 +46,14 @@
         <th>Environment</th>
         <th>Story points</th>
         <th>T-Shirt Size</th>
-        <th></th>
-      </tr>
-      <tr id="deleteColRow">
-        <!-- delete column buttons inserted here -->
       </tr>
     </thead>
-    <tbody></tbody>
+    <tbody id="outputBody"></tbody>
   </table>
 
 <script>
   let appcodeMap = {};
   let groupedData = {};
-  const mandatoryColumns = ['Appcode', 'Summary', 'Product team', 'Environment'];
 
   function updateRowCount() {
     const count = document.querySelectorAll('#outputTable tbody tr').length;
@@ -119,10 +119,8 @@
         groupedData[key].resources.push(row[resourceIdx]);
       });
 
-      const tbody = document.querySelector('#outputTable tbody');
-      const deleteColRow = document.getElementById('deleteColRow');
+      const tbody = document.getElementById('outputBody');
       tbody.innerHTML = '';
-      deleteColRow.innerHTML = '';
 
       Object.values(groupedData).forEach((group, idx) => {
         const groupedResourcesPretty = group.resources.map(r => `"${r}"`).join(', ');
@@ -131,31 +129,35 @@
         const productTeam = appcodeMap[group.app.toUpperCase()] || 'OTHERS';
 
         const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td>${group.app}</td>
-          <td>${summaryText}</td>
-          <td></td>
-          <td><pre>${descriptionText.replace(/\\n/g, '\n')}</pre></td>
-          <td>${groupedResourcesPretty}</td>
-          <td></td>
-          <td>${productTeam}</td>
-          <td>${group.env}</td>
-          <td></td>
-          <td></td>
-          <td><button class="delete-btn" onclick="this.closest('tr').remove(); updateRowCount()">❌</button></td>
-        `;
-        tbody.appendChild(tr);
-      });
+        const cells = [
+          group.app,
+          summaryText,
+          '',
+          descriptionText.replace(/\\n/g, '\n'),
+          groupedResourcesPretty,
+          '',
+          productTeam,
+          group.env,
+          '',
+          ''
+        ];
 
-      // Add delete column buttons
-      const headerCols = document.querySelectorAll('#headerRow th');
-      headerCols.forEach((th, index) => {
-        const colName = th.innerText.trim();
-        const td = document.createElement('td');
-        if (colName && !mandatoryColumns.includes(colName)) {
-          td.innerHTML = `<button class="delete-btn" onclick="deleteColumn(${index})">❌</button>`;
-        }
-        deleteColRow.appendChild(td);
+        cells.forEach((cellText, i) => {
+          const td = document.createElement('td');
+          td.textContent = cellText;
+          tr.appendChild(td);
+        });
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'delete-btn';
+        deleteBtn.title = 'Delete row';
+        deleteBtn.textContent = '×';
+        deleteBtn.onclick = () => {
+          tr.remove();
+          updateRowCount();
+        };
+        tr.firstChild.appendChild(deleteBtn);
+        tbody.appendChild(tr);
       });
 
       document.getElementById('outputTable').style.display = 'table';
@@ -167,26 +169,17 @@
     else reader.readAsText(file);
   });
 
-  function deleteColumn(index) {
-    const rows = document.querySelectorAll('#outputTable tr');
-    rows.forEach(row => {
-      if (row.cells.length > index) {
-        row.deleteCell(index);
-      }
-    });
-  }
-
   document.getElementById('downloadBtn').addEventListener('click', () => {
     const rows = Array.from(document.querySelectorAll('#outputTable tbody tr')).map(row => {
-      return Array.from(row.cells).slice(0, -1).map(cell => {
+      return Array.from(row.cells).map(cell => {
         const text = cell.innerText || '';
         return (text.includes(',') || text.includes('"') || text.includes('\n'))
-          ? `"${text.replace(/"/g, '""')}"`
+          ? `"${text.replace(/"/g, '""')}`
           : text;
       });
     });
 
-    const headers = Array.from(document.querySelectorAll('#headerRow th')).slice(0, -1).map(th => th.innerText);
+    const headers = Array.from(document.querySelectorAll('#headerRow th')).map(th => th.innerText);
     const csvRows = [headers, ...rows];
     const csvString = csvRows.map(r => r.join(',')).join('\r\n');
 
