@@ -2,28 +2,15 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Jira CSV/XLSX Tool with Delete and Summary</title>
+  <title>Jira Bulk CSV/XLSX Tool</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
     body { font-family: Arial, sans-serif; padding: 20px; }
     table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; vertical-align: top; position: relative; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; vertical-align: top; }
     th { background-color: #f4f4f4; }
     button { margin-top: 10px; padding: 8px 12px; cursor: pointer; }
-    .delete-btn {
-      background: red;
-      color: white;
-      font-size: 0.8em;
-      border: none;
-      border-radius: 4px;
-      padding: 2px 6px;
-      position: absolute;
-      top: 2px;
-      right: 2px;
-      cursor: pointer;
-    }
     pre { margin: 0; font-family: inherit; white-space: pre-wrap; }
-    .summary { font-weight: bold; margin-top: 10px; }
   </style>
 </head>
 <body>
@@ -31,11 +18,10 @@
   <p id="status">Loading <code>appcodes.csv</code>...</p>
   <input type="file" id="csvFile" accept=".csv,.xlsx" disabled />
   <button id="downloadBtn" disabled>Download Final Jira CSV</button>
-  <p class="summary" id="summaryText"></p>
 
   <table id="outputTable" style="display:none;">
     <thead>
-      <tr id="headerRow">
+      <tr>
         <th>Appcode</th>
         <th>Summary</th>
         <th>Issue Type</th>
@@ -48,18 +34,14 @@
         <th>T-Shirt Size</th>
       </tr>
     </thead>
-    <tbody id="outputBody"></tbody>
+    <tbody></tbody>
   </table>
 
 <script>
   let appcodeMap = {};
   let groupedData = {};
 
-  function updateRowCount() {
-    const count = document.querySelectorAll('#outputTable tbody tr').length;
-    document.getElementById('summaryText').textContent = `${count} row(s) displayed`;
-  }
-
+  // Load appcodes.csv
   fetch('appcodes.csv')
     .then(res => res.text())
     .then(text => {
@@ -91,7 +73,7 @@
         const sheetName = workbook.SheetNames[0];
         const sheet = workbook.Sheets[sheetName];
         const json = XLSX.utils.sheet_to_json(sheet, { header: 1, blankrows: false });
-        rows = json.filter(r => r.length);
+        rows = json.filter(r => r.length); // Remove blank rows
       } else {
         rows = event.target.result.trim().split('\n').map(line => {
           const matches = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
@@ -106,6 +88,7 @@
       const envIdx = headers.indexOf('ENVIRONMENT');
 
       groupedData = {};
+
       rows.forEach(row => {
         const key = row[policyIdx] + '|' + row[appIdx];
         if (!groupedData[key]) {
@@ -119,78 +102,103 @@
         groupedData[key].resources.push(row[resourceIdx]);
       });
 
-      const tbody = document.getElementById('outputBody');
+      const tbody = document.querySelector('#outputTable tbody');
       tbody.innerHTML = '';
 
-      Object.values(groupedData).forEach((group, idx) => {
+      Object.values(groupedData).forEach(group => {
         const groupedResourcesPretty = group.resources.map(r => `"${r}"`).join(', ');
         const summaryText = `Azure compliance: ${group.app} [${group.env}]`;
         const descriptionText = `Policy: ${group.policy}\\nComponents: ${groupedResourcesPretty}`;
         const productTeam = appcodeMap[group.app.toUpperCase()] || 'OTHERS';
 
         const tr = document.createElement('tr');
-        const cells = [
-          group.app,
-          summaryText,
-          '',
-          descriptionText.replace(/\\n/g, '\n'),
-          groupedResourcesPretty,
-          '',
-          productTeam,
-          group.env,
-          '',
-          ''
-        ];
-
-        cells.forEach((cellText, i) => {
-          const td = document.createElement('td');
-          td.textContent = cellText;
-          tr.appendChild(td);
-        });
-
-        const deleteBtn = document.createElement('button');
-        deleteBtn.className = 'delete-btn';
-        deleteBtn.title = 'Delete row';
-        deleteBtn.textContent = '×';
-        deleteBtn.onclick = () => {
-          tr.remove();
-          updateRowCount();
-        };
-        tr.firstChild.appendChild(deleteBtn);
+        tr.innerHTML = `
+          <td>${group.app}</td>
+          <td>${summaryText}</td>
+          <td></td>
+          <td><pre>${descriptionText.replace(/\\n/g, '\n')}</pre></td>
+          <td>${groupedResourcesPretty}</td>
+          <td></td>
+          <td>${productTeam}</td>
+          <td>${group.env}</td>
+          <td></td>
+          <td></td>
+        `;
         tbody.appendChild(tr);
       });
 
       document.getElementById('outputTable').style.display = 'table';
       document.getElementById('downloadBtn').disabled = false;
-      updateRowCount();
     };
 
-    if (ext === 'xlsx') reader.readAsBinaryString(file);
-    else reader.readAsText(file);
+    if (ext === 'xlsx') {
+      reader.readAsBinaryString(file);
+    } else {
+      reader.readAsText(file);
+    }
   });
 
   document.getElementById('downloadBtn').addEventListener('click', () => {
-    const rows = Array.from(document.querySelectorAll('#outputTable tbody tr')).map(row => {
-      return Array.from(row.cells).map(cell => {
-        const text = cell.innerText || '';
-        return (text.includes(',') || text.includes('"') || text.includes('\n'))
-          ? `"${text.replace(/"/g, '""')}`
-          : text;
+    if (!groupedData) return;
+
+    const csvHeaders = [
+      'Appcode',
+      'Summary',
+      'Issue Type',
+      'Description',
+      'Components',
+      'Epic Link',
+      'Product team',
+      'Environment',
+      'Story points',
+      'T-Shirt Size'
+    ];
+
+    const csvRows = [csvHeaders];
+
+    Object.values(groupedData).forEach(group => {
+      const groupedResourcesPretty = group.resources.map(r => `"${r}"`).join(', ');
+      const summaryText = `Azure compliance: ${group.app} [${group.env}]`;
+      const descriptionText = `Policy: ${group.policy}\\nComponents: ${groupedResourcesPretty}`;
+      const productTeam = appcodeMap[group.app.toUpperCase()] || 'OTHERS';
+
+      const row = [
+        group.app,
+        summaryText,
+        '',
+        descriptionText,
+        groupedResourcesPretty,
+        '',
+        productTeam,
+        group.env,
+        '',
+        ''
+      ];
+
+      const escapedRow = row.map(cell => {
+        if (cell == null) return '';
+        const cellStr = String(cell);
+        if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n') || cellStr.includes('\r')) {
+          return `"${cellStr.replace(/"/g, '""')}"`;
+        }
+        return cellStr;
       });
+
+      csvRows.push(escapedRow);
     });
 
-    const headers = Array.from(document.querySelectorAll('#headerRow th')).map(th => th.innerText);
-    const csvRows = [headers, ...rows];
     const csvString = csvRows.map(r => r.join(',')).join('\r\n');
 
     const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
+
     const a = document.createElement('a');
     a.href = url;
     a.download = 'jira_bulk_issues.csv';
     a.style.display = 'none';
     document.body.appendChild(a);
     a.click();
+
     setTimeout(() => {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
