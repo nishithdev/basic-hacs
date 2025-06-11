@@ -40,6 +40,10 @@
 <script>
   let appcodeMap = {};
   let groupedData = {};
+  const FILTER_TEXT = "Applied filters"; // 🔍 Filter out any row containing this
+
+  // Show summary
+  const status = document.getElementById("status");
 
   // Load appcodes.csv
   fetch('appcodes.csv')
@@ -51,11 +55,11 @@
         const [code, team] = line.split(',');
         if (code && team) appcodeMap[code.trim().toUpperCase()] = team.trim();
       });
-      document.getElementById('status').textContent = "✅ appcodes.csv loaded. Now upload CSV or XLSX.";
+      status.textContent = "✅ appcodes.csv loaded. Now upload CSV or XLSX.";
       document.getElementById('csvFile').disabled = false;
     })
     .catch(err => {
-      document.getElementById('status').textContent = "❌ Failed to load appcodes.csv: " + err.message;
+      status.textContent = "❌ Failed to load appcodes.csv: " + err.message;
     });
 
   document.getElementById('csvFile').addEventListener('change', function (e) {
@@ -70,10 +74,8 @@
 
       if (ext === 'xlsx') {
         const workbook = XLSX.read(event.target.result, { type: 'binary' });
-        const sheetName = workbook.SheetNames[0];
-        const sheet = workbook.Sheets[sheetName];
-        const json = XLSX.utils.sheet_to_json(sheet, { header: 1, blankrows: false });
-        rows = json.filter(r => r.length); // Remove blank rows
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        rows = XLSX.utils.sheet_to_json(sheet, { header: 1 }).filter(r => r.length);
       } else {
         rows = event.target.result.trim().split('\n').map(line => {
           const matches = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
@@ -89,7 +91,12 @@
 
       groupedData = {};
 
-      rows.forEach(row => {
+      // Filter out rows with filter text
+      const filteredRows = rows.filter(row =>
+        !row.some(cell => String(cell).toLowerCase().includes(FILTER_TEXT.toLowerCase()))
+      );
+
+      filteredRows.forEach(row => {
         const key = row[policyIdx] + '|' + row[appIdx];
         if (!groupedData[key]) {
           groupedData[key] = {
@@ -105,7 +112,10 @@
       const tbody = document.querySelector('#outputTable tbody');
       tbody.innerHTML = '';
 
-      Object.values(groupedData).forEach(group => {
+      const groupedValues = Object.values(groupedData);
+      status.textContent = `✅ Loaded. Showing ${groupedValues.length} row(s) after filtering.`;
+
+      groupedValues.forEach(group => {
         const groupedResourcesPretty = group.resources.map(r => `"${r}"`).join(', ');
         const summaryText = `Azure compliance: ${group.app} [${group.env}]`;
         const descriptionText = `Policy: ${group.policy}\\nComponents: ${groupedResourcesPretty}`;
@@ -188,7 +198,6 @@
     });
 
     const csvString = csvRows.map(r => r.join(',')).join('\r\n');
-
     const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
 
