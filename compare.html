@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>GitHub File Viewer</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 2rem;
+      max-width: 800px;
+    }
+    input, button {
+      padding: 0.5rem;
+      margin: 0.25rem 0;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    pre {
+      background: #f4f4f4;
+      padding: 1rem;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      border: 1px solid #ccc;
+    }
+    .error {
+      color: red;
+    }
+  </style>
+</head>
+<body>
+  <h1>Enterprise GitHub File Viewer</h1>
+
+  <label>Enterprise GitHub Base URL (no trailing slash)</label>
+  <input id="baseUrl" placeholder="https://github.yourcompany.com/api/v3" />
+
+  <label>Repo Owner (user or org)</label>
+  <input id="owner" placeholder="your-org" />
+
+  <label>Repository Name</label>
+  <input id="repo" placeholder="your-repo" />
+
+  <label>Branch</label>
+  <input id="branch" placeholder="main" value="main" />
+
+  <label>File Path</label>
+  <input id="filePath" placeholder="path/to/file.yml" />
+
+  <button onclick="fetchFile()">Fetch File</button>
+
+  <p id="status" class="error"></p>
+  <pre id="output">Waiting for input...</pre>
+
+  <script>
+    async function fetchFile() {
+      const baseUrl = document.getElementById("baseUrl").value.trim();
+      const owner = document.getElementById("owner").value.trim();
+      const repo = document.getElementById("repo").value.trim();
+      const branch = document.getElementById("branch").value.trim();
+      const filePath = document.getElementById("filePath").value.trim();
+      const output = document.getElementById("output");
+      const status = document.getElementById("status");
+
+      if (!baseUrl || !owner || !repo || !filePath || !branch) {
+        status.textContent = "Please fill in all fields.";
+        return;
+      }
+
+      status.textContent = "Fetching file...";
+      output.textContent = "";
+
+      const url = `${baseUrl}/repos/${owner}/${repo}/contents/${filePath}?ref=${branch}`;
+
+      try {
+        const res = await fetch(url, {
+          headers: {
+            Accept: "application/vnd.github.v3.raw"
+          }
+        });
+
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status} - ${res.statusText}`);
+        }
+
+        const content = await res.text();
+        output.textContent = content;
+        status.textContent = "";
+      } catch (err) {
+        status.textContent = "Error: " + err.message;
+        output.textContent = "";
+      }
+    }
+  </script>
+</body>
+</html>
